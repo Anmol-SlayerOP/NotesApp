@@ -20,7 +20,10 @@ router.use(authenticate);
 /**
  * GET /notes
  * Returns all notes accessible to the authenticated user (owned + shared).
- * Query params: page, page_size
+ * Query params:
+ *   page, page_size  — pagination
+ *   sort=true        — sort by pinned first, then priority desc, then modified_at desc
+ *                      (omit or sort=false for insertion order)
  */
 router.get(
   '/',
@@ -29,7 +32,8 @@ router.get(
     try {
       const userId = req.user!.userId;
       const pagination = req.query as unknown as PaginationDto;
-      const result = await noteService.getAllNotes(userId, pagination);
+      const sort = req.query['sort'] === 'true';
+      const result = await noteService.getAllNotes(userId, pagination, sort);
       res.status(200).json(result);
     } catch (err) {
       next(err);

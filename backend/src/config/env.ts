@@ -34,6 +34,7 @@ export interface AppConfig {
   jwtSecret: string;
   jwtExpiration: string;
   geminiApiKey: string;
+  geminiModel: string;
   rateLimitWindowMs: number;
   rateLimitMaxRequests: number;
   dbPoolMin: number;
@@ -49,6 +50,7 @@ function loadConfig(): AppConfig {
     jwtSecret: requireEnv('JWT_SECRET'),
     geminiApiKey: requireEnv('GEMINI_API_KEY'),
     // Optional with sensible defaults
+    geminiModel: optionalEnv('GEMINI_MODEL', 'gemini-2.5-flash'),
     jwtExpiration: optionalEnv('JWT_EXPIRATION', '7d'),
     rateLimitWindowMs: optionalEnvInt('RATE_LIMIT_WINDOW_MS', 900000),
     rateLimitMaxRequests: optionalEnvInt('RATE_LIMIT_MAX_REQUESTS', 100),

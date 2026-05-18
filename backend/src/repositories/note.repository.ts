@@ -8,8 +8,8 @@ import { CreateNoteDto, UpdateNoteDto, PaginationDto } from '../types/dto';
 export interface NoteRepository {
   create(userId: string, data: CreateNoteDto): Promise<Note>;
   findById(noteId: string): Promise<Note | null>;
-  findByUserId(userId: string, pagination: PaginationDto): Promise<PaginatedNotes>;
-  findSharedWithUser(userId: string, pagination: PaginationDto): Promise<Note[]>;
+  findByUserId(userId: string, pagination: PaginationDto, sort?: boolean): Promise<PaginatedNotes>;
+  findSharedWithUser(userId: string, pagination: PaginationDto, sort?: boolean): Promise<Note[]>;
   update(noteId: string, data: UpdateNoteDto): Promise<Note>;
   delete(noteId: string): Promise<void>;
   search(userId: string, queryStr: string, pagination: PaginationDto): Promise<PaginatedNotes>;
@@ -71,12 +71,16 @@ export class NoteRepositoryImpl implements NoteRepository {
   }
 
   /**
-   * Returns all notes owned by a user, sorted and paginated.
-   * Sort order: pinned DESC, priority DESC, modified_at DESC.
+   * Returns all notes owned by a user, paginated.
+   * When sort=true: pinned DESC, priority DESC, modified_at DESC.
+   * When sort=false (default): created_at DESC (insertion order).
    */
-  async findByUserId(userId: string, pagination: PaginationDto): Promise<PaginatedNotes> {
+  async findByUserId(userId: string, pagination: PaginationDto, sort = false): Promise<PaginatedNotes> {
     const { page, page_size } = pagination;
     const offset = (page - 1) * page_size;
+    const orderBy = sort
+      ? 'ORDER BY pinned DESC, priority DESC, modified_at DESC'
+      : 'ORDER BY created_at DESC';
 
     const [dataResult, countResult] = await Promise.all([
       query<NoteRow>(
@@ -84,7 +88,7 @@ export class NoteRepositoryImpl implements NoteRepository {
                 FALSE AS is_shared
          FROM notes
          WHERE user_id = $1
-         ORDER BY pinned DESC, priority DESC, modified_at DESC
+         ${orderBy}
          LIMIT $2 OFFSET $3`,
         [userId, page_size, offset],
       ),
@@ -106,10 +110,15 @@ export class NoteRepositoryImpl implements NoteRepository {
 
   /**
    * Returns all notes shared with a user (not owned by them).
+   * When sort=true: pinned DESC, priority DESC, modified_at DESC.
+   * When sort=false (default): created_at DESC.
    */
-  async findSharedWithUser(userId: string, pagination: PaginationDto): Promise<Note[]> {
+  async findSharedWithUser(userId: string, pagination: PaginationDto, sort = false): Promise<Note[]> {
     const { page_size, page } = pagination;
     const offset = (page - 1) * page_size;
+    const orderBy = sort
+      ? 'ORDER BY n.pinned DESC, n.priority DESC, n.modified_at DESC'
+      : 'ORDER BY n.created_at DESC';
 
     const result = await query<NoteRow>(
       `SELECT n.id, n.user_id, n.title, n.content, n.priority, n.pinned,
@@ -117,7 +126,7 @@ export class NoteRepositoryImpl implements NoteRepository {
        FROM notes n
        INNER JOIN shares s ON s.note_id = n.id
        WHERE s.shared_with_user_id = $1
-       ORDER BY n.pinned DESC, n.priority DESC, n.modified_at DESC
+       ${orderBy}
        LIMIT $2 OFFSET $3`,
       [userId, page_size, offset],
     );

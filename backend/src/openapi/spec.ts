@@ -154,6 +154,7 @@ export const openApiSpec = {
         parameters: [
           { name: 'page', in: 'query', schema: { type: 'integer', default: 1 } },
           { name: 'page_size', in: 'query', schema: { type: 'integer', default: 20, maximum: 100 } },
+          { name: 'sort', in: 'query', schema: { type: 'boolean', default: false }, description: 'When true, sorts by pinned first, then priority desc, then modified_at desc. Default is insertion order.' },
         ],
         responses: {
           '200': { description: 'Paginated list of notes', content: { 'application/json': { schema: { $ref: '#/components/schemas/PaginatedNotes' } } } },

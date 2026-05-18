@@ -13,6 +13,7 @@ export default defineConfig({
       JWT_SECRET: 'test-secret-key-for-unit-tests-only-not-production',
       JWT_EXPIRATION: '1h',
       GEMINI_API_KEY: 'test-gemini-key',
+      GEMINI_MODEL: 'gemini-1.5-flash-latest',
       RATE_LIMIT_WINDOW_MS: '900000',
       RATE_LIMIT_MAX_REQUESTS: '1000',
       DB_POOL_MIN: '1',

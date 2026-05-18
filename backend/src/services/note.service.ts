@@ -7,7 +7,7 @@ import { shareRepository, ShareRepository } from '../repositories/share.reposito
 export interface NoteService {
   createNote(userId: string, data: CreateNoteDto): Promise<Note>;
   getNoteById(noteId: string, userId: string): Promise<Note>;
-  getAllNotes(userId: string, pagination: PaginationDto): Promise<PaginatedNotes>;
+  getAllNotes(userId: string, pagination: PaginationDto, sort?: boolean): Promise<PaginatedNotes>;
   updateNote(noteId: string, userId: string, data: UpdateNoteDto): Promise<Note>;
   deleteNote(noteId: string, userId: string): Promise<void>;
   searchNotes(userId: string, queryStr: string, pagination: PaginationDto): Promise<PaginatedNotes>;
@@ -56,45 +56,48 @@ export class NoteServiceImpl implements NoteService {
   }
 
   /**
-   * Returns all notes accessible to the user (owned + shared),
-   * merged and sorted: pinned first → priority desc → modified_at desc.
-   * Supports pagination.
+   * Returns all notes accessible to the user (owned + shared).
+   * When sort=true: pinned first → priority desc → modified_at desc.
+   * When sort=false (default): insertion order (created_at desc).
    */
-  async getAllNotes(userId: string, pagination: PaginationDto): Promise<PaginatedNotes> {
-    // Fetch owned notes (paginated) and all shared notes in parallel
+  async getAllNotes(userId: string, pagination: PaginationDto, sort = false): Promise<PaginatedNotes> {
     const [ownedResult, sharedNotes] = await Promise.all([
-      this.noteRepo.findByUserId(userId, pagination),
-      this.noteRepo.findSharedWithUser(userId, pagination),
+      this.noteRepo.findByUserId(userId, pagination, sort),
+      this.noteRepo.findSharedWithUser(userId, pagination, sort),
     ]);
 
-    // Merge, de-duplicate (shouldn't happen but guard anyway), and re-sort
+    // Merge owned + shared, de-duplicate
     const noteMap = new Map<string, Note>();
     for (const n of ownedResult.notes) noteMap.set(n.id, n);
     for (const n of sharedNotes) {
       if (!noteMap.has(n.id)) noteMap.set(n.id, n);
     }
 
-    const merged = Array.from(noteMap.values()).sort((a, b) => {
-      // pinned first
-      if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
-      // higher priority first
-      if (a.priority !== b.priority) return b.priority - a.priority;
-      // most recently modified first
-      return new Date(b.modified_at).getTime() - new Date(a.modified_at).getTime();
-    });
+    let merged = Array.from(noteMap.values());
 
-    // Apply pagination to merged result
+    if (sort) {
+      merged = merged.sort((a, b) => {
+        if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+        if (a.priority !== b.priority) return b.priority - a.priority;
+        return new Date(b.modified_at).getTime() - new Date(a.modified_at).getTime();
+      });
+    } else {
+      // Default: most recently created first
+      merged = merged.sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+      );
+    }
+
     const { page, page_size } = pagination;
     const offset = (page - 1) * page_size;
     const paginated = merged.slice(offset, offset + page_size);
-    const total = merged.length;
 
     return {
       notes: paginated,
-      total,
+      total: merged.length,
       page,
       page_size,
-      total_pages: Math.ceil(total / page_size),
+      total_pages: Math.ceil(merged.length / page_size),
     };
   }
 
