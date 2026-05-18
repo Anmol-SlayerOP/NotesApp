@@ -45,7 +45,7 @@ export class AIAnalyzerServiceImpl implements AIAnalyzerService {
     // 3. Call Gemini
     let rawResponse: string;
     try {
-      const model = this.genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+      const model = this.genAI.getGenerativeModel({ model: 'gemini-1.5-flash-latest' });
       const result = await model.generateContent(prompt);
       rawResponse = result.response.text();
     } catch (err) {
