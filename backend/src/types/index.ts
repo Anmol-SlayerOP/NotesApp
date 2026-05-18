@@ -70,10 +70,14 @@ export interface ErrorLog {
 /**
  * Express Request extended with the authenticated user identity.
  * Populated by the authentication middleware after JWT verification.
+ *
+ * We use a type intersection rather than interface extension to avoid
+ * TypeScript strict-mode complaints about missing index signatures on
+ * the base Request type when accessing .body, .params, .query.
  */
-export interface AuthenticatedRequest extends Request {
+export type AuthenticatedRequest = Request & {
   user?: {
     userId: string;
     username: string;
   };
-}
+};
