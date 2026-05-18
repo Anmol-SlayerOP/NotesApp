@@ -126,9 +126,9 @@ export class NoteRepositoryImpl implements NoteRepository {
 
   /**
    * Updates specified fields on a note and refreshes modified_at.
+   * Uses $N parameterized placeholders to prevent SQL injection.
    */
   async update(noteId: string, data: UpdateNoteDto): Promise<Note> {
-    // Build dynamic SET clause from provided fields only
     const setClauses: string[] = ['modified_at = NOW()'];
     const params: unknown[] = [];
     let paramIdx = 1;
@@ -170,14 +170,18 @@ export class NoteRepositoryImpl implements NoteRepository {
   }
 
   /**
-   * Full-text search across notes accessible to a user (owned + shared).
-   * Uses PostgreSQL to_tsvector / plainto_tsquery for case-insensitive matching.
+   * Case-insensitive search across notes accessible to a user (owned + shared).
+   *
+   * Uses ILIKE for reliable partial-word matching across all PostgreSQL
+   * configurations. The full-text GIN index is kept for future use but
+   * ILIKE is simpler and works correctly for all query patterns including
+   * partial words, mixed case, and short strings.
    */
   async search(userId: string, queryStr: string, pagination: PaginationDto): Promise<PaginatedNotes> {
     const { page, page_size } = pagination;
     const offset = (page - 1) * page_size;
+    const pattern = `%${queryStr}%`;
 
-    // Accessible note IDs = owned + shared
     const [dataResult, countResult] = await Promise.all([
       query<NoteRow>(
         `SELECT DISTINCT n.id, n.user_id, n.title, n.content, n.priority, n.pinned,
@@ -186,18 +190,18 @@ export class NoteRepositoryImpl implements NoteRepository {
          FROM notes n
          LEFT JOIN shares s ON s.note_id = n.id AND s.shared_with_user_id = $1
          WHERE (n.user_id = $1 OR s.shared_with_user_id = $1)
-           AND to_tsvector('english', n.title || ' ' || n.content) @@ plainto_tsquery('english', $2)
+           AND (n.title ILIKE $2 OR n.content ILIKE $2)
          ORDER BY n.pinned DESC, n.priority DESC, n.modified_at DESC
          LIMIT $3 OFFSET $4`,
-        [userId, queryStr, page_size, offset],
+        [userId, pattern, page_size, offset],
       ),
       query<{ count: string }>(
         `SELECT COUNT(DISTINCT n.id) AS count
          FROM notes n
          LEFT JOIN shares s ON s.note_id = n.id AND s.shared_with_user_id = $1
          WHERE (n.user_id = $1 OR s.shared_with_user_id = $1)
-           AND to_tsvector('english', n.title || ' ' || n.content) @@ plainto_tsquery('english', $2)`,
-        [userId, queryStr],
+           AND (n.title ILIKE $2 OR n.content ILIKE $2)`,
+        [userId, pattern],
       ),
     ]);
 
