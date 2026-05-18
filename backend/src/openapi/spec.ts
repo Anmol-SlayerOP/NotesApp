@@ -10,7 +10,7 @@ export const openApiSpec = {
     description:
       'A multi-user notes service with JWT authentication, note sharing, full-text search, and AI-powered importance analysis.',
   },
-  servers: [{ url: '/', description: 'Current server' }],
+  servers: [{ url: 'https://notes-app-backend-26rd.onrender.com', description: 'Current server' }],
   components: {
     securitySchemes: {
       BearerAuth: {
